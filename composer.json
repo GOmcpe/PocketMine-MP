@@ -35,6 +35,7 @@
       "fgrosse/phpasn1": "^2.3",
       "netresearch/jsonmapper": "^4.0",
       "nethergames/bedrock-protocol": "dev-master",
+	  "czechpmdevs/libpmform": "dev-main",
       "pocketmine/binaryutils": "^0.2.1",
       "pocketmine/callback-validator": "^1.0.2",
       "pocketmine/classloader": "dev-master",
@@ -62,6 +63,10 @@
       {
          "type": "vcs",
          "url":  "git@github.com:NetherGamesMC/BedrockProtocol.git"
+      },
+	  {
+         "type": "vcs",
+         "url":  "git@github.com:CzechPMDevs/libpmform.git"
       }
    ],
    "autoload": {
