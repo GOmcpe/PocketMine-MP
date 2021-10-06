@@ -23,29 +23,31 @@ declare(strict_types=1);
 
 namespace pocketmine\plugin;
 
-/**
- * Handles different types of plugins
- */
-interface PluginLoader{
+final class PluginDescriptionCommandEntry{
 
 	/**
-	 * Returns whether this PluginLoader can load the plugin in the given path.
+	 * @param string[] $aliases
+	 * @phpstan-param list<string> $aliases
 	 */
-	public function canLoadPlugin(string $path) : bool;
+	public function __construct(
+		private ?string $description,
+		private ?string $usageMessage,
+		private array $aliases,
+		private string $permission,
+		private ?string $permissionDeniedMessage,
+	){}
+
+	public function getDescription() : ?string{ return $this->description; }
+
+	public function getUsageMessage() : ?string{ return $this->usageMessage; }
 
 	/**
-	 * Loads the plugin contained in $file
+	 * @return string[]
+	 * @phpstan-return list<string>
 	 */
-	public function loadPlugin(string $file) : void;
+	public function getAliases() : array{ return $this->aliases; }
 
-	/**
-	 * Gets the PluginDescription from the file
-	 * @throws PluginDescriptionParseException
-	 */
-	public function getPluginDescription(string $file) : ?PluginDescription;
+	public function getPermission() : string{ return $this->permission; }
 
-	/**
-	 * Returns the protocol prefix used to access files in this plugin, e.g. file://, phar://
-	 */
-	public function getAccessProtocol() : string;
+	public function getPermissionDeniedMessage() : ?string{ return $this->permissionDeniedMessage; }
 }
