@@ -122,49 +122,6 @@
             "time": "2021-08-15T20:50:18+00:00"
         },
         {
-            "name": "czechpmdevs/libpmform",
-            "version": "dev-main",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/CzechPMDevs/libpmform.git",
-                "reference": "792fd1b1e26d51278a9af2d8dabd90216b610fcb"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/CzechPMDevs/libpmform/zipball/792fd1b1e26d51278a9af2d8dabd90216b610fcb",
-                "reference": "792fd1b1e26d51278a9af2d8dabd90216b610fcb",
-                "shasum": ""
-            },
-            "require": {
-                "php": "^7.4 || ^8.0",
-                "phpstan/phpstan": "^0.12.89",
-                "pocketmine/pocketmine-mp": "dev-master"
-            },
-            "default-branch": true,
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "": [
-                        "src"
-                    ]
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "authors": [
-                {
-                    "name": "VixikHD"
-                }
-            ],
-            "description": "Simple form library",
-            "support": {
-                "source": "https://github.com/CzechPMDevs/libpmform/tree/main",
-                "issues": "https://github.com/CzechPMDevs/libpmform/issues"
-            },
-            "time": "2021-07-22T21:04:44+00:00"
-        },
-        {
             "name": "fgrosse/phpasn1",
             "version": "v2.3.0",
             "source": {
@@ -2196,6 +2153,70 @@
                 "source": "https://github.com/phpspec/prophecy/tree/1.14.0"
             },
             "time": "2021-09-10T09:02:12+00:00"
+        },
+        {
+            "name": "phpstan/phpstan",
+            "version": "0.12.98",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/phpstan/phpstan.git",
+                "reference": "3bb7cc246c057405dd5e290c3ecc62ab51d57e00"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/3bb7cc246c057405dd5e290c3ecc62ab51d57e00",
+                "reference": "3bb7cc246c057405dd5e290c3ecc62ab51d57e00",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^7.1|^8.0"
+            },
+            "conflict": {
+                "phpstan/phpstan-shim": "*"
+            },
+            "bin": [
+                "phpstan",
+                "phpstan.phar"
+            ],
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "0.12-dev"
+                }
+            },
+            "autoload": {
+                "files": [
+                    "bootstrap.php"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "PHPStan - PHP Static Analysis Tool",
+            "support": {
+                "issues": "https://github.com/phpstan/phpstan/issues",
+                "source": "https://github.com/phpstan/phpstan/tree/0.12.98"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/ondrejmirtes",
+                    "type": "github"
+                },
+                {
+                    "url": "https://github.com/phpstan",
+                    "type": "github"
+                },
+                {
+                    "url": "https://www.patreon.com/phpstan",
+                    "type": "patreon"
+                },
+                {
+                    "url": "https://tidelift.com/funding/github/packagist/phpstan/phpstan",
+                    "type": "tidelift"
+                }
+            ],
+            "time": "2021-09-02T12:33:01+00:00"
         },
         {
             "name": "phpstan/phpstan-phpunit",
