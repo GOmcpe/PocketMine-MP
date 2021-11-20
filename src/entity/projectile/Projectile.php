@@ -77,32 +77,28 @@ abstract class Projectile extends Entity{
 		$this->setHealth(1);
 		$this->damage = $nbt->getDouble("damage", $this->damage);
 
-		do{
-			$blockPos = null;
-			$blockId = null;
-			$blockData = null;
-
+		(function() use ($nbt) : void{
 			if(($tileXTag = $nbt->getTag("tileX")) instanceof IntTag and ($tileYTag = $nbt->getTag("tileY")) instanceof IntTag and ($tileZTag = $nbt->getTag("tileZ")) instanceof IntTag){
 				$blockPos = new Vector3($tileXTag->getValue(), $tileYTag->getValue(), $tileZTag->getValue());
 			}else{
-				break;
+				return;
 			}
 
 			if(($blockIdTag = $nbt->getTag("blockId")) instanceof IntTag){
 				$blockId = $blockIdTag->getValue();
 			}else{
-				break;
+				return;
 			}
 
 			if(($blockDataTag = $nbt->getTag("blockData")) instanceof ByteTag){
 				$blockData = $blockDataTag->getValue();
 			}else{
-				break;
+				return;
 			}
 
 			$this->blockHit = BlockFactory::getInstance()->get($blockId, $blockData);
 			$this->blockHit->position($this->getWorld(), $blockPos->getFloorX(), $blockPos->getFloorY(), $blockPos->getFloorZ());
-		}while(false);
+		})();
 	}
 
 	public function canCollideWith(Entity $entity) : bool{
@@ -182,16 +178,20 @@ abstract class Projectile extends Entity{
 		$entityHit = null;
 		$hitResult = null;
 
-		foreach(VoxelRayTrace::betweenPoints($start, $end) as $vector3){
-			$block = $this->getWorld()->getBlockAt($vector3->x, $vector3->y, $vector3->z);
+		try {
+			foreach(VoxelRayTrace::betweenPoints($start, $end) as $vector3){
+				$block = $this->getWorld()->getBlockAt($vector3->x, $vector3->y, $vector3->z);
 
-			$blockHitResult = $this->calculateInterceptWithBlock($block, $start, $end);
-			if($blockHitResult !== null){
-				$end = $blockHitResult->hitVector;
-				$blockHit = $block;
-				$hitResult = $blockHitResult;
-				break;
+				$blockHitResult = $this->calculateInterceptWithBlock($block, $start, $end);
+				if($blockHitResult !== null){
+					$end = $blockHitResult->hitVector;
+					$blockHit = $block;
+					$hitResult = $blockHitResult;
+					break;
+				}
 			}
+		} catch(\InvalidArgumentException $e){
+			$this->flagForDespawn();
 		}
 
 		$entityDistance = PHP_INT_MAX;

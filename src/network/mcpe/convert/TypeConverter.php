@@ -24,10 +24,9 @@ namespace pocketmine\network\mcpe\convert;
 
 use pocketmine\block\BlockLegacyIds;
 use pocketmine\block\inventory\AnvilInventory;
+use pocketmine\block\inventory\CraftingTableInventory;
 use pocketmine\block\inventory\EnchantInventory;
 use pocketmine\block\inventory\LoomInventory;
-use pocketmine\crafting\CraftingGrid;
-use pocketmine\inventory\Inventory;
 use pocketmine\inventory\transaction\action\CreateItemAction;
 use pocketmine\inventory\transaction\action\DestroyItemAction;
 use pocketmine\inventory\transaction\action\DropItemAction;
@@ -51,21 +50,23 @@ use pocketmine\player\GameMode;
 use pocketmine\player\Player;
 use pocketmine\utils\AssumptionFailedError;
 use pocketmine\utils\SingletonTrait;
-use function array_key_exists;
 
 class TypeConverter{
 	use SingletonTrait;
 
 	private const DAMAGE_TAG = "Damage"; //TAG_Int
 	private const DAMAGE_TAG_CONFLICT_RESOLUTION = "___Damage_ProtocolCollisionResolution___";
+	private const PM_ID_TAG = "___Id___";
 	private const PM_META_TAG = "___Meta___";
 
-	/** @var int */
-	private $shieldRuntimeId;
+	/** @var int[] */
+	private $shieldRuntimeIds;
 
 	public function __construct(){
 		//TODO: inject stuff via constructor
-		$this->shieldRuntimeId = GlobalItemTypeDictionary::getInstance()->getDictionary()->fromStringId("minecraft:shield");
+		foreach(GlobalItemTypeDictionary::getInstance()->getDictionaries() as $protocolId => $dictionary){
+			$this->shieldRuntimeIds[$protocolId] = $dictionary->fromStringId("minecraft:shield");
+		}
 	}
 
 	/**
@@ -143,26 +144,40 @@ class TypeConverter{
 		}
 
 		$isBlockItem = $itemStack->getId() < 256;
-		if($itemStack instanceof Durable and $itemStack->getDamage() > 0){
-			if($nbt !== null){
-				if(($existing = $nbt->getTag(self::DAMAGE_TAG)) !== null){
-					$nbt->removeTag(self::DAMAGE_TAG);
-					$nbt->setTag(self::DAMAGE_TAG_CONFLICT_RESOLUTION, $existing);
-				}
-			}else{
-				$nbt = new CompoundTag();
-			}
-			$nbt->setInt(self::DAMAGE_TAG, $itemStack->getDamage());
-		}elseif($isBlockItem && $itemStack->getMeta() !== 0){
-			//TODO HACK: This foul-smelling code ensures that we can correctly deserialize an item when the
-			//client sends it back to us, because as of 1.16.220, blockitems quietly discard their metadata
-			//client-side. Aside from being very annoying, this also breaks various server-side behaviours.
+		$dictionaryProtocol = GlobalItemTypeDictionary::getDictionaryProtocol($protocolId);
+		$idMeta = ItemTranslator::getInstance()->toNetworkIdQuiet($dictionaryProtocol, $itemStack->getId(), $itemStack->getMeta());
+		if($idMeta === null){
+			//Display unmapped items as INFO_UPDATE, but stick something in their NBT to make sure they don't stack with
+			//other unmapped items.
+			[$id, $meta] = ItemTranslator::getInstance()->toNetworkId($dictionaryProtocol, ItemIds::INFO_UPDATE, 0);
 			if($nbt === null){
 				$nbt = new CompoundTag();
 			}
+			$nbt->setInt(self::PM_ID_TAG, $itemStack->getId());
 			$nbt->setInt(self::PM_META_TAG, $itemStack->getMeta());
+		}else{
+			[$id, $meta] = $idMeta;
+
+			if($itemStack instanceof Durable and $itemStack->getDamage() > 0){
+				if($nbt !== null){
+					if(($existing = $nbt->getTag(self::DAMAGE_TAG)) !== null){
+						$nbt->removeTag(self::DAMAGE_TAG);
+						$nbt->setTag(self::DAMAGE_TAG_CONFLICT_RESOLUTION, $existing);
+					}
+				}else{
+					$nbt = new CompoundTag();
+				}
+				$nbt->setInt(self::DAMAGE_TAG, $itemStack->getDamage());
+			}elseif($isBlockItem && $itemStack->getMeta() !== 0){
+				//TODO HACK: This foul-smelling code ensures that we can correctly deserialize an item when the
+				//client sends it back to us, because as of 1.16.220, blockitems quietly discard their metadata
+				//client-side. Aside from being very annoying, this also breaks various server-side behaviours.
+				if($nbt === null){
+					$nbt = new CompoundTag();
+				}
+				$nbt->setInt(self::PM_META_TAG, $itemStack->getMeta());
+			}
 		}
-		[$id, $meta] = ItemTranslator::getInstance()->toNetworkId(GlobalItemTypeDictionary::getDictionaryProtocol($protocolId), $itemStack->getId(), $itemStack->getMeta());
 
 		$blockRuntimeId = 0;
 		if($isBlockItem){
@@ -180,7 +195,7 @@ class TypeConverter{
 			$nbt,
 			[],
 			[],
-			$id === $this->shieldRuntimeId ? 0 : null
+			$id === $this->shieldRuntimeIds[$dictionaryProtocol] ? 0 : null
 		);
 	}
 
@@ -197,14 +212,16 @@ class TypeConverter{
 
 		if($compound !== null){
 			$compound = clone $compound;
+			if(($idTag = $compound->getTag(self::PM_ID_TAG)) instanceof IntTag){
+				$id = $idTag->getValue();
+				$compound->removeTag(self::PM_ID_TAG);
+			}
 			if(($damageTag = $compound->getTag(self::DAMAGE_TAG)) instanceof IntTag){
 				$meta = $damageTag->getValue();
 				$compound->removeTag(self::DAMAGE_TAG);
 				if(($conflicted = $compound->getTag(self::DAMAGE_TAG_CONFLICT_RESOLUTION)) !== null){
 					$compound->removeTag(self::DAMAGE_TAG_CONFLICT_RESOLUTION);
 					$compound->setTag(self::DAMAGE_TAG, $conflicted);
-				}elseif($compound->count() === 0){
-					$compound = null;
 				}
 			}elseif(($metaTag = $compound->getTag(self::PM_META_TAG)) instanceof IntTag){
 				//TODO HACK: This foul-smelling code ensures that we can correctly deserialize an item when the
@@ -212,9 +229,9 @@ class TypeConverter{
 				//client-side. Aside from being very annoying, this also breaks various server-side behaviours.
 				$meta = $metaTag->getValue();
 				$compound->removeTag(self::PM_META_TAG);
-				if($compound->count() === 0){
-					$compound = null;
-				}
+			}
+			if($compound->count() === 0){
+				$compound = null;
 			}
 		}
 
@@ -228,22 +245,6 @@ class TypeConverter{
 		}catch(NbtException $e){
 			throw TypeConversionException::wrap($e, "Bad itemstack NBT data");
 		}
-	}
-
-	/**
-	 * @param int[] $test
-	 * @phpstan-param array<int, int> $test
-	 * @phpstan-param \Closure(Inventory) : bool $c
-	 * @phpstan-return array{int, Inventory}
-	 */
-	protected function mapUIInventory(int $slot, array $test, ?Inventory $inventory, \Closure $c) : ?array{
-		if($inventory === null){
-			return null;
-		}
-		if(array_key_exists($slot, $test) && $c($inventory)){
-			return [$test[$slot], $inventory];
-		}
-		return null;
 	}
 
 	/**
@@ -266,32 +267,32 @@ class TypeConverter{
 		}
 		switch($action->sourceType){
 			case NetworkInventoryAction::SOURCE_CONTAINER:
+				$window = null;
 				if($action->windowId === ContainerIds::UI and $action->inventorySlot > 0){
 					if($action->inventorySlot === UIInventorySlotOffset::CREATED_ITEM_OUTPUT){
 						return null; //useless noise
 					}
 					$pSlot = $action->inventorySlot;
 
-					$craftingGrid = $player->getCraftingGrid();
-					$mapped =
-						$this->mapUIInventory($pSlot, UIInventorySlotOffset::CRAFTING2X2_INPUT, $craftingGrid,
-							function(Inventory $i) : bool{ return $i instanceof CraftingGrid && $i->getGridWidth() === CraftingGrid::SIZE_SMALL; }) ??
-						$this->mapUIInventory($pSlot, UIInventorySlotOffset::CRAFTING3X3_INPUT, $craftingGrid,
-							function(Inventory $i) : bool{ return $i instanceof CraftingGrid && $i->getGridWidth() === CraftingGrid::SIZE_BIG; });
-					if($mapped === null){
-						$current = $player->getCurrentWindow();
-						$mapped =
-							$this->mapUIInventory($pSlot, UIInventorySlotOffset::ANVIL, $current,
-								function(Inventory $i) : bool{ return $i instanceof AnvilInventory; }) ??
-							$this->mapUIInventory($pSlot, UIInventorySlotOffset::ENCHANTING_TABLE, $current,
-								function(Inventory $i) : bool{ return $i instanceof EnchantInventory; }) ??
-							$this->mapUIInventory($pSlot, UIInventorySlotOffset::LOOM, $current,
-								fn(Inventory $i) => $i instanceof LoomInventory);
+					$slot = UIInventorySlotOffset::CRAFTING2X2_INPUT[$pSlot] ?? null;
+					if($slot !== null){
+						$window = $player->getCraftingGrid();
+					}elseif(($current = $player->getCurrentWindow()) !== null){
+						$slotMap = match(true){
+							$current instanceof AnvilInventory => UIInventorySlotOffset::ANVIL,
+							$current instanceof EnchantInventory => UIInventorySlotOffset::ENCHANTING_TABLE,
+							$current instanceof LoomInventory => UIInventorySlotOffset::LOOM,
+							$current instanceof CraftingTableInventory => UIInventorySlotOffset::CRAFTING3X3_INPUT,
+							default => null
+						};
+						if($slotMap !== null){
+							$window = $current;
+							$slot = $slotMap[$pSlot] ?? null;
+						}
 					}
-					if($mapped === null){
+					if($slot === null){
 						throw new TypeConversionException("Unmatched UI inventory slot offset $pSlot");
 					}
-					[$slot, $window] = $mapped;
 				}else{
 					$window = $inventoryManager->getWindow($action->windowId);
 					$slot = $action->inventorySlot;
